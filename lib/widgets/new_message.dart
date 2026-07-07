@@ -53,14 +53,38 @@ class _NewMessageState extends State<NewMessage> {
               textCapitalization: TextCapitalization.sentences,
               autocorrect: true,
               enableSuggestions: true,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Send a message...',
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: Colors.blue,
+                    strokeAlign: 1,
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: Colors.blue,
+                    strokeAlign: 1,
+                  ),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(
+                    color: Colors.red,
+                    strokeAlign: 1,
+                  ),
+                ),
               ),
             ),
           ),
           IconButton(
             color: Theme.of(context).colorScheme.primary,
-            icon: const Icon(Icons.send),
+            icon: const Icon(
+              Icons.send,
+              color: Colors.blue,
+            ),
             onPressed: _sumbitMessage,
           ),
         ],
