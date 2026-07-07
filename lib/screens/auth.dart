@@ -1,4 +1,8 @@
-import 'package:firebase_core/firebase_core.dart';
+import 'dart:io';
+
+import 'package:chat_app/widgets/user_image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -16,6 +20,9 @@ class _AuthScreenState extends State<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
   var _enteredEmail = '';
   var _enteredPassword = '';
+  var _username = '';
+  File? _selectedImage;
+  var _isLoading = false;
 
   void _showInfoMessage(String message) {
     ScaffoldMessenger.of(context).clearSnackBars();
@@ -41,11 +48,15 @@ class _AuthScreenState extends State<AuthScreen> {
 
   void _submit() async {
     final isValid = _formKey.currentState!.validate();
-    if (!isValid) {
+    if (!isValid || !_isLogin && _selectedImage == null) {
+      _showInfoMessage('Please fill all the credentials correctly image also.');
       return;
     }
     _formKey.currentState!.save();
     try {
+      setState(() {
+        _isLoading = true;
+      });
       if (_isLogin) {
         final userCredentials = await _firebaseAuth.signInWithEmailAndPassword(
           email: _enteredEmail,
@@ -58,10 +69,29 @@ class _AuthScreenState extends State<AuthScreen> {
               email: _enteredEmail,
               password: _enteredPassword,
             );
-        print(userCredentials);
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child('user_images')
+            .child('${userCredentials.user!.uid}.jpg');
+        await storageRef.putFile(_selectedImage!);
+        final imageUrl = await storageRef.getDownloadURL();
+        print(imageUrl);
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredentials.user!.uid)
+            .set({
+              'username': _username,
+              'email': _enteredEmail,
+              'password': _enteredPassword,
+              'image_url': imageUrl,
+            });
       }
     } on FirebaseAuthException catch (error) {
       _showInfoMessage(error.message!);
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -84,7 +114,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                 ),
-                width: 200,
+                width: 400,
                 child: Image.asset('assets/images/chat.png'),
               ),
               Card(
@@ -95,8 +125,15 @@ class _AuthScreenState extends State<AuthScreen> {
                     child: Form(
                       key: _formKey,
                       child: Column(
+                        spacing: 10,
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (!_isLogin)
+                            UserImagePicker(
+                              onPickImage: (image) {
+                                _selectedImage = image;
+                              },
+                            ),
                           TextFormField(
                             keyboardType: TextInputType.emailAddress,
                             decoration: const InputDecoration(
@@ -117,9 +154,24 @@ class _AuthScreenState extends State<AuthScreen> {
                               _enteredEmail = value!;
                             },
                           ),
-                          const SizedBox(
-                            height: 12,
-                          ),
+                          if (!_isLogin)
+                            TextFormField(
+                              decoration: const InputDecoration(
+                                labelText: 'Username',
+                              ),
+                              enableSuggestions: false,
+                              validator: (value) {
+                                if (value == null ||
+                                    value.isEmpty ||
+                                    value.length < 5) {
+                                  return 'Please enter at least 5 characters';
+                                }
+                                return null;
+                              },
+                              onSaved: (value) {
+                                _username = value!;
+                              },
+                            ),
                           TextFormField(
                             decoration: const InputDecoration(
                               labelText: 'Password',
@@ -136,34 +188,38 @@ class _AuthScreenState extends State<AuthScreen> {
                               _enteredPassword = value!;
                             },
                           ),
-                          const SizedBox(
-                            height: 12,
-                          ),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(
-                                  context,
-                                ).colorScheme.primaryContainer,
+                          if (_isLoading)
+                            const CircularProgressIndicator(
+                              strokeWidth: 1,
+                              color: Colors.black,
+                            ),
+                          if (!_isLoading)
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primaryContainer,
+                                ),
+                                onPressed: _submit,
+                                child: Text(_isLogin ? 'Log In' : 'Sign Up'),
                               ),
-                              onPressed: _submit,
-                              child: Text(_isLogin ? 'Log In' : 'Sign Up'),
                             ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              // _isLogin=!_isLogin;
-                              setState(() {
-                                _isLogin = _isLogin ? false : true;
-                              });
-                            },
-                            child: Text(
-                              _isLogin
-                                  ? 'Create Account'
-                                  : 'Already have an account',
+                          if (!_isLoading)
+                            TextButton(
+                              onPressed: () {
+                                // _isLogin=!_isLogin;
+                                setState(() {
+                                  _isLogin = _isLogin ? false : true;
+                                });
+                              },
+                              child: Text(
+                                _isLogin
+                                    ? 'Create Account'
+                                    : 'Already have an account',
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ),
